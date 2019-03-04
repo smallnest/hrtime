@@ -1,8 +1,38 @@
 package hrtime
 
 import (
+	"math"
 	"time"
 )
+
+// MergeBenchmarks merge multiple Benchmark so we can use it in concurrent cases.
+// Each goroutine uses its Benchmark and we can merge the results into one Benchmark.
+func MergeBenchmarks(benchmarks ...*Benchmark) *Benchmark {
+	if len(benchmarks) == 0 {
+		return nil
+	}
+
+	var start = time.Duration(math.MaxInt64)
+	var stop time.Duration
+	var laps []time.Duration
+	for _, b := range benchmarks {
+		b.mustBeCompleted()
+		laps = append(laps, b.laps...)
+		if b.start < start {
+			start = b.start
+		}
+		if b.stop > stop {
+			stop = b.stop
+		}
+	}
+
+	return &Benchmark{
+		step:  len(laps),
+		laps:  laps,
+		start: start,
+		stop:  stop,
+	}
+}
 
 // Benchmark helps benchmarking using time.
 type Benchmark struct {
@@ -41,11 +71,11 @@ func (bench *Benchmark) finalize(last time.Duration) {
 	}
 
 	bench.start = bench.laps[0]
-	bench.stop = last
 	for i := range bench.laps[:len(bench.laps)-1] {
 		bench.laps[i] = bench.laps[i+1] - bench.laps[i]
 	}
-	bench.laps[len(bench.laps)-1] = bench.stop - bench.laps[len(bench.laps)-1]
+	bench.laps[len(bench.laps)-1] = last - bench.laps[len(bench.laps)-1]
+	bench.stop = last
 }
 
 // Next starts measuring the next lap.
