@@ -1,8 +1,38 @@
 package hrtime
 
 import (
+	"math"
 	"time"
 )
+
+// MergeBenchmarkTSCs merge multiple BenchmarkTSC so we can use it in concurrent cases.
+// Each goroutine uses its BenchmarkTSC and we can merge the results into one BenchmarkTSC.
+func MergeBenchmarkTSCs(benchmarks ...*BenchmarkTSC) *BenchmarkTSC {
+	if len(benchmarks) == 0 {
+		return nil
+	}
+
+	var start = Count(math.MaxInt64)
+	var stop Count
+	var counts []Count
+	for _, b := range benchmarks {
+		b.mustBeCompleted()
+		counts = append(counts, b.counts...)
+		if b.start < start {
+			start = b.start
+		}
+		if b.stop > stop {
+			stop = b.stop
+		}
+	}
+
+	return &BenchmarkTSC{
+		step:   len(counts),
+		counts: counts,
+		start:  start,
+		stop:   stop,
+	}
+}
 
 // BenchmarkTSC helps benchmarking using CPU counters.
 type BenchmarkTSC struct {
